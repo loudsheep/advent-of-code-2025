@@ -1,4 +1,4 @@
-use advent_of_code_2025::{parse_csv_line, read_line, read_lines};
+use advent_of_code_2025::{parse_csv_line, read_line};
 
 fn parse_range(s: &str) -> (i64, i64) {
     let parts: Vec<&str> = s.split('-').collect();
@@ -10,12 +10,22 @@ fn parse_range(s: &str) -> (i64, i64) {
 fn is_invalid_id(id: i64) -> bool {
     let id_str = id.to_string();
 
-    if id_str.len() % 2 != 0 {
-        return false; // must have even number of digits
+    for i in 1..(id_str.len() / 2 + 1) {
+        if id_str.len() % i != 0 {
+            continue;
+        }
+
+        let segment = &id_str[0..i];
+        let mut repeated = String::new();
+        for _ in 0..(id_str.len() / i) {
+            repeated.push_str(segment);
+        }
+        if repeated == id_str {
+            return true;
+        }
     }
-    // check if first half matches second half
-    let half_len = id_str.len() / 2;
-    id_str[..half_len] == id_str[half_len..]
+
+    false
 }
 
 fn check_ids_in_range(start: i64, end: i64) -> i64 {
