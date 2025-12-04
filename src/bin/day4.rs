@@ -31,30 +31,41 @@ fn count_neighbors(grid: &Vec<Vec<char>>, row: isize, col: isize) -> usize {
     count
 }
 
-fn count_movable_rolls(grid: &Vec<Vec<char>>) -> usize {
+fn count_movable_rolls(grid: &mut Vec<Vec<char>>) -> usize {
     let mut count = 0;
+
+    let mut newgrid = grid.clone();
     
     for i in 0..grid.len() {
         for j in 0..grid[i].len() {
             if grid[i][j] == '@' {
                 let neighbors = count_neighbors(grid, i as isize, j as isize);
                 if neighbors < 4 {
+                    newgrid[i][j] = '.';
                     count += 1;
                 }
             }
         }
     }
 
+    *grid = newgrid;
     count
 }
 
 fn main() {
     let lines = read_lines("input/day4.txt").expect("Expected a grid");
-    let grid = lines
+    let mut grid = lines
         .into_iter()
         .map(|line| line.chars().collect::<Vec<char>>())
         .collect::<Vec<Vec<char>>>();
     
-    let movable_rolls = count_movable_rolls(&grid);
-    println!("Number of movable rolls: {}", movable_rolls);
+    let mut total_count = 0;
+    loop {
+        let movable_rolls = count_movable_rolls(&mut grid);
+        if movable_rolls == 0 {
+            break;
+        }
+        total_count += movable_rolls;
+    }
+    println!("Number of movable rolls: {}", total_count);
 }
