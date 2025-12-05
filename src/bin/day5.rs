@@ -37,6 +37,30 @@ fn count_valid_ingredients(
     valid_count
 }
 
+fn collapse_overlapping_ranges(
+    ranges: &[(u64, u64)],
+) -> Vec<(u64, u64)> {
+    let mut sorted_ranges = ranges.to_vec();
+    sorted_ranges.sort_by_key(|r| r.0);
+    let mut collapsed: Vec<(u64, u64)> = Vec::new();
+
+    for range in sorted_ranges {
+        if let Some(last) = collapsed.last_mut() {
+            // if current range starts before or just after the last range ends, merge them
+            if range.0 <= last.1 + 1 {
+                last.1 = last.1.max(range.1);
+                continue;
+            }
+        }
+        collapsed.push(range);
+    }
+    collapsed
+}
+
+fn count_all_ingriedients_in_ranges(collapsed: Vec<(u64, u64)>) -> u64 {
+    collapsed.iter().map(|(start, end)| end - start + 1).sum()
+}
+
 fn main() {
     let lines = read_lines("input/day5.txt").expect("Expected input");
     let blank_line_index = lines
@@ -48,4 +72,9 @@ fn main() {
 
     let valid_ingredient_count = count_valid_ingredients(ranges, ingredients);
     println!("Number of valid ingredients: {}", valid_ingredient_count);
+
+    let parsed_ranges: Vec<(u64, u64)> = ranges.iter().map(|r| parse_range(r)).collect();
+    let collapsed_ranges = collapse_overlapping_ranges(&parsed_ranges);
+    let total_ingredient_count = count_all_ingriedients_in_ranges(collapsed_ranges);
+    println!("Total number of ingredients in ranges: {}", total_ingredient_count);
 }
