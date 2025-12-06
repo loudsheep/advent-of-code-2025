@@ -19,3 +19,7 @@ pub fn read_line(filename: impl AsRef<Path>) -> io::Result<String> {
 pub fn parse_csv_line(line: &str) -> Vec<String> {
     line.split(',').map(|s| s.trim().to_string()).collect()
 }
+
+pub fn split_by_whitespaces(line: &str) -> Vec<String> {
+    line.split_whitespace().map(|s| s.to_string()).collect()
+}
