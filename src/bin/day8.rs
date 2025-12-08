@@ -1,6 +1,6 @@
 use advent_of_code_2025::read_lines;
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 struct JunctionBox {
     x: i64,
     y: i64,
@@ -42,14 +42,14 @@ struct Edge {
 // disjoint set union
 struct DSU {
     parent: Vec<usize>,
-    size: Vec<usize>,
+    num_components: usize,
 }
 
 impl DSU {
     fn new(n: usize) -> Self {
         DSU {
             parent: (0..n).collect(),
-            size: vec![1; n],
+            num_components: n,
         }
     }
 
@@ -68,19 +68,13 @@ impl DSU {
             return false;
         }
 
-        if self.size[root_a] < self.size[root_b] {
-            self.parent[root_a] = root_b;
-            self.size[root_b] += self.size[root_a];
-        } else {
-            self.parent[root_b] = root_a;
-            self.size[root_a] += self.size[root_b];
-        }
-
+        self.parent[root_a] = root_b;
+        self.num_components -= 1;
         true
     }
 }
 
-fn solve(boxes: Vec<JunctionBox>) -> u64 {
+fn solve(boxes: Vec<JunctionBox>) {
     let n = boxes.len();
     let mut edges = Vec::new();
 
@@ -99,21 +93,23 @@ fn solve(boxes: Vec<JunctionBox>) -> u64 {
 
     let mut dsu = DSU::new(n);
 
-    for edge in edges.iter().take(n) {
-        dsu.union(edge.a, edge.b);
-    }
+    for edge in edges {
+        if dsu.union(edge.a, edge.b) {
+            if dsu.num_components == 1 {
+                let p1 = boxes[edge.a];
+                let p2 = boxes[edge.b];
 
-    let mut circuit_sizes = Vec::new();
+                println!("Final connection made between:");
+                println!("Point 1: {:?}", p1);
+                println!("Point 2: {:?}", p2);
+    
+                let result = p1.x * p2.x;
+                println!("Answer (Product of X coords): {}", result);
+                return;
+            }
 
-    for i in 0..n {
-        if dsu.parent[i] == i {
-            circuit_sizes.push(dsu.size[i] as u64);
         }
     }
-
-    circuit_sizes.sort_unstable_by(|a, b| b.cmp(a));
-
-    circuit_sizes[0] * circuit_sizes[1] * circuit_sizes[2]
 }
 
 fn main() {
@@ -124,6 +120,5 @@ fn main() {
         .collect::<Option<Vec<_>>>()
         .expect("Invalid input");
 
-    let result = solve(boxes);
-    println!("Result: {}", result);
+    solve(boxes);
 }
