@@ -31,7 +31,7 @@ cargo run --bin day1
 - [x] Day 6
 - [x] Day 7
 - [x] Day 8
-- [ ] Day 9
-- [ ] Day 10
-- [ ] Day 11
+- [X] Day 9
+- [X] Day 10
+- [X] Day 11
 - [ ] Day 12
