@@ -5,26 +5,18 @@ use regex::Regex;
 
 #[derive(Debug)]
 struct Machine {
-    target_lights: Vec<u8>,
     buttons: Vec<Vec<usize>>,
     target_joltage: Vec<i64>,
 }
 
 // [.###.#] (0,1,2,3,4) (0,3,4) (0,1,2,4,5) (1,2) {10,11,11,5,10,5}
 fn parse_input(lines: Vec<String>) -> Vec<Machine> {
-    let re_diagram = Regex::new(r"\[([.#]+)\]").unwrap();
     let re_buttons = Regex::new(r"\(([\d,]+)\)").unwrap();
     let re_joltage = Regex::new(r"\{([\d,]+)\}").unwrap();
 
     lines
         .iter()
         .map(|line| {
-            let caps = re_diagram.captures(line).expect("Invalid diagram");
-            let target_lights: Vec<u8> = caps[1]
-                .chars()
-                .map(|c| if c == '#' { 1 } else { 0 })
-                .collect();
-
             let buttons: Vec<Vec<usize>> = re_buttons
                 .captures_iter(line)
                 .map(|cap| {
@@ -45,7 +37,6 @@ fn parse_input(lines: Vec<String>) -> Vec<Machine> {
             };
 
             Machine {
-                target_lights,
                 buttons,
                 target_joltage,
             }
@@ -154,7 +145,6 @@ fn solve_machine(machine: &Machine) -> Option<usize> {
     ) {
         if idx == free_cols.len() {
             let mut valid = true;
-            let mut current_sum = 0;
 
             for (r_idx, &p_col) in pivot_cols.iter().enumerate() {
                 let (mut tn, mut td) = matrix[r_idx][matrix[0].len() - 1];
@@ -186,7 +176,7 @@ fn solve_machine(machine: &Machine) -> Option<usize> {
 
             if valid {
                 for r in pivot_cols.len()..matrix.len() {
-                    let (tn, td) = matrix[r][matrix[0].len() - 1];
+                    let (tn, _) = matrix[r][matrix[0].len() - 1];
                     if tn != 0 {
                         return;
                     }
