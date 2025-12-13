@@ -1,24 +1,21 @@
+use std::collections::HashSet;
+
 use advent_of_code_2025::read_lines;
 use regex::Regex;
 
-const SHAPE_SIZE_X: i32 = 3;
-const SHAPE_SIZE_Y: i32 = 3;
+const MAX_SHAPE_DIM: usize = 3;
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
-struct Coord {
-    x: i32,
-    y: i32,
+struct BitShape {
+    rows: [u64; MAX_SHAPE_DIM],
+    width: usize,
+    height: usize,
+    area: u32,
 }
 
-#[derive(Clone)]
-struct Shape {
-    coords: Vec<Coord>,
-    area: i32,
-}
-
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 struct Present {
-    shape_variants: Vec<Shape>,
+    variants: Vec<BitShape>,
 }
 
 struct Region {
@@ -27,105 +24,108 @@ struct Region {
     presents_to_place: Vec<usize>,
 }
 
-struct FastGrid {
-    width: i32,
-    height: i32,
-    cells: Vec<bool>,
+struct BitGrid {
+    height: usize,
+    width: usize,
+    rows: Vec<u64>,
 }
 
-impl FastGrid {
-    fn new(width: i32, height: i32) -> Self {
-        Self {
-            width,
+impl BitGrid {
+    fn new(width: usize, height: usize) -> Self {
+        BitGrid {
             height,
-            cells: vec![false; (width * height) as usize],
+            width,
+            rows: vec![0; height],
         }
     }
 
-    fn get(&self, x: i32, y: i32) -> bool {
-        self.cells[(y * self.width + x) as usize]
-    }
-
-    fn set(&mut self, x: i32, y: i32, val: bool) {
-        self.cells[(y * self.width + x) as usize] = val;
-    }
-
-    fn can_fit(&self, shape: &Shape, start_x: i32, start_y: i32) -> bool {
-        if start_x + SHAPE_SIZE_X > self.width || start_y + SHAPE_SIZE_Y > self.height {
+    fn can_place(&self, shape: &BitShape, x: usize, y: usize) -> bool {
+        if x + shape.width > self.width || y + shape.height > self.height {
             return false;
         }
 
-        for offset in &shape.coords {
-            if self.get(start_x + offset.x, start_y + offset.y) {
-                return false;
-            }
+        if (self.rows[y] & (shape.rows[0] << x)) != 0 {
+            return false;
         }
+        if shape.height > 1 && (self.rows[y + 1] & (shape.rows[1] << x)) != 0 {
+            return false;
+        }
+        if shape.height > 2 && (self.rows[y + 2] & (shape.rows[2] << x)) != 0 {
+            return false;
+        }
+
         true
     }
 
-    fn place_shape(&mut self, shape: &Shape, start_x: i32, start_y: i32, val: bool) {
-        for offset in &shape.coords {
-            self.set(start_x + offset.x, start_y + offset.y, val);
+    fn toggle_shape(&mut self, shape: &BitShape, x: usize, y: usize) {
+        self.rows[y] ^= shape.rows[0] << x;
+        if shape.height > 1 {
+            self.rows[y + 1] ^= shape.rows[1] << x;
+        }
+        if shape.height > 2 {
+            self.rows[y + 2] ^= shape.rows[2] << x;
         }
     }
 }
 
-fn calculate_present_variants(shape: &Shape) -> Vec<Shape> {
+fn parse_to_bitshape(coords: &Vec<(i32, i32)>) -> BitShape {
+    if coords.is_empty() {
+        return BitShape {
+            rows: [0; 3],
+            width: 0,
+            height: 0,
+            area: 0,
+        };
+    }
+
+    let min_x = coords.iter().map(|c| c.0).min().unwrap();
+    let min_y = coords.iter().map(|c| c.1).min().unwrap();
+
+    let mut max_x = 0;
+    let mut max_y = 0;
+
+    let mut rows = [0u64; 3];
+
+    for &(cx, cy) in coords {
+        let x = (cx - min_x) as usize;
+        let y = (cy - min_y) as usize;
+
+        rows[y] |= 1 << x;
+
+        if x > max_x {
+            max_x = x;
+        }
+        if y > max_y {
+            max_y = y;
+        }
+    }
+
+    BitShape {
+        rows,
+        width: max_x + 1,
+        height: max_y + 1,
+        area: coords.len() as u32,
+    }
+}
+
+fn generate_variants(base_coords: &Vec<(i32, i32)>) -> Vec<BitShape> {
+    let mut unique_shapes = HashSet::new();
     let mut variants = Vec::new();
+    let mut current = base_coords.clone();
 
-    // Original shape
-    variants.push(Shape {
-        coords: shape.coords.clone(),
-        area: shape.area,
-    });
+    for i in 0..8 {
+        let shape = parse_to_bitshape(&current);
 
-    // Rotated shapes (90, 180, 270 degrees), but keep it relative to origin (top-left corner of shape)
-    for _ in 0..3 {
-        let last_shape = variants.last().unwrap();
-        let rotated_coords: Vec<Coord> = last_shape
-            .coords
-            .iter()
-            .map(|coord| Coord {
-                x: SHAPE_SIZE_Y - 1 - coord.y,
-                y: coord.x,
-            })
-            .collect();
-        variants.push(Shape {
-            coords: rotated_coords,
-            area: shape.area,
-        });
+        if unique_shapes.insert(shape.clone()) {
+            variants.push(shape);
+        }
+
+        if i % 4 == 3 {
+            current = base_coords.iter().map(|c| (-c.0, c.1)).collect();
+        } else {
+            current = current.iter().map(|c| (-c.1, c.0)).collect();
+        }
     }
-
-    // Flipped shapes (horizontal flip)
-    variants.push(Shape {
-        coords: shape
-            .coords
-            .iter()
-            .map(|coord| Coord {
-                x: SHAPE_SIZE_X - 1 - coord.x,
-                y: coord.y,
-            })
-            .collect(),
-        area: shape.area,
-    });
-
-    // Rotated flipped shapes (90, 180, 270 degrees)
-    for _ in 0..3 {
-        let last_shape = variants.last().unwrap();
-        let rotated_coords: Vec<Coord> = last_shape
-            .coords
-            .iter()
-            .map(|coord| Coord {
-                x: SHAPE_SIZE_Y - 1 - coord.y,
-                y: coord.x,
-            })
-            .collect();
-        variants.push(Shape {
-            coords: rotated_coords,
-            area: shape.area,
-        });
-    }
-
     variants
 }
 
@@ -139,7 +139,7 @@ fn parse_input(lines: Vec<String>) -> (Vec<Present>, Vec<Region>) {
     let mut presents: Vec<Present> = Vec::new();
     let mut regions: Vec<Region> = Vec::new();
 
-    let mut current_shape_coords: Vec<Coord> = Vec::new();
+    let mut current_shape_coords: Vec<(i32, i32)> = Vec::new();
     let mut parsing_shape = false;
     let mut y = 0;
     for line in lines {
@@ -148,16 +148,10 @@ fn parse_input(lines: Vec<String>) -> (Vec<Present>, Vec<Region>) {
             y = 0;
 
             if !current_shape_coords.is_empty() {
-                let shape = Shape {
-                    coords: current_shape_coords.clone(),
-                    area: current_shape_coords.len() as i32,
-                };
-                let variants = calculate_present_variants(&shape);
-                let present = Present {
-                    shape_variants: variants,
-                };
-                current_shape_coords.clear();
+                let variants = generate_variants(&current_shape_coords);
+                let present = Present { variants };
                 presents.push(present);
+                current_shape_coords.clear();
             }
 
             continue;
@@ -166,10 +160,7 @@ fn parse_input(lines: Vec<String>) -> (Vec<Present>, Vec<Region>) {
         if parsing_shape {
             for (x, ch) in line.chars().enumerate() {
                 if ch == '#' {
-                    current_shape_coords.push(Coord {
-                        x: x as i32,
-                        y: y as i32,
-                    });
+                    current_shape_coords.push((x as i32, y as i32));
                 }
             }
             y += 1;
@@ -211,59 +202,53 @@ fn parse_input(lines: Vec<String>) -> (Vec<Present>, Vec<Region>) {
     (presents, regions)
 }
 
-fn solve_region(
-    grid: &mut FastGrid,
-    remaining_presents: &[usize],
-    all_presents: &Vec<Present>,
-) -> bool {
+fn solve(grid: &mut BitGrid, remaining_presents: &[usize], all_presents: &Vec<Present>) -> bool {
     if remaining_presents.is_empty() {
         return true;
     }
 
-    let current_id = remaining_presents[0];
+    let p_idx = remaining_presents[0];
+    let present = &all_presents[p_idx];
     let next_presents = &remaining_presents[1..];
 
-    let present = &all_presents[current_id];
+    for y in 0..=(grid.height - 1) {
+        for x in 0..=(grid.width - 1) {
+            for variant in &present.variants {
+                if grid.can_place(variant, x, y) {
+                    grid.toggle_shape(variant, x, y);
 
-    for r in 0..grid.height {
-        for c in 0..grid.width {
-            for shape_variant in &present.shape_variants {
-                if grid.can_fit(shape_variant, c, r) {
-                    grid.place_shape(shape_variant, c, r, true);
-
-                    if solve_region(grid, next_presents, all_presents) {
+                    if solve(grid, next_presents, all_presents) {
                         return true;
                     }
 
-                    grid.place_shape(shape_variant, c, r, false);
+                    grid.toggle_shape(variant, x, y);
                 }
             }
         }
     }
-
     false
 }
 
 fn main() {
-    let lines = read_lines("input/day12_example.txt").expect("File expected");
+    let lines = read_lines("input/day12.txt").expect("File expected");
 
     let (presents, regions) = parse_input(lines);
     let mut count_solved = 0;
 
     for (_, region) in regions.into_iter().enumerate() {
-        let mut grid = FastGrid::new(region.width, region.height);
+        let mut grid = BitGrid::new(region.width as usize, region.height as usize);
 
         let presents_to_solve = region.presents_to_place.clone();
         let total_present_area: i32 = presents_to_solve
             .iter()
-            .map(|&id| presents[id].shape_variants[0].area)
+            .map(|&id| presents[id].variants[0].area as i32)
             .sum();
 
         if total_present_area > region.width * region.height {
             continue;
         }
 
-        if solve_region(&mut grid, &region.presents_to_place, &presents) {
+        if solve(&mut grid, &region.presents_to_place, &presents) {
             count_solved += 1;
         }
     }
